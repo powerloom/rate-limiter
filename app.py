@@ -1,4 +1,5 @@
 import os
+import logging
 from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
@@ -8,11 +9,13 @@ from dotenv import load_dotenv
 from fastapi import Depends
 from fastapi import FastAPI
 from fastapi import Request
+from loguru import logger
 from pydantic import BaseModel
 from slowapi import _rate_limit_exceeded_handler
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+import sys
 
 # Load environment variables from .env file
 load_dotenv()
@@ -23,7 +26,17 @@ RATE_LIMIT = os.getenv('DEFAULT_RATE_LIMIT', '10')
 
 DEFAULT_RATE_LIMIT = f'{RATE_LIMIT}/second'
 
-print(f'DEFAULT_RATE_LIMIT: {DEFAULT_RATE_LIMIT}')
+# Configure loguru to only show warning and error logs
+logger.remove()
+logger.add(
+    sink=sys.stderr,
+    level="WARNING",
+    format="{time} | {level} | {message}"
+)
+
+# Disable FastAPI default access logs
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+logging.getLogger("uvicorn").setLevel(logging.WARNING)
 
 # Initialize FastAPI app with title
 app = FastAPI(title='Rate Limiter')
@@ -204,6 +217,13 @@ async def check_rate_limit(request: Request, key: str):
     # The actual rate limiting is handled by the decorator
     return key
 
+# health check endpoint
+@app.get('/health')
+async def health_check():
+    """
+    Health check endpoint.
+    """
+    return {'status': 'ok'}
 
 # Routes
 @app.get('/check/{key}')
